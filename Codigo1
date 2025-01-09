@@ -1,0 +1,201 @@
+import pygame
+import random
+
+# --- Funciones del Sudoku ---
+
+def crear_sudoku_vacio():
+    """Crea una cuadrícula de Sudoku vacía."""
+    return [[0 for _ in range(9)] for _ in range(9)]
+
+def es_valido(sudoku, fila, columna, caracter):
+    """Verifica si es válido colocar un caracter en una celda específica.
+
+    Args:
+      sudoku: La cuadrícula del Sudoku.
+      fila: La fila de la celda.
+      columna: La columna de la celda.
+      caracter: El caracter a colocar.
+
+    Returns:
+      True si es válido, False en caso contrario.
+    """
+    # Comprobar si el caracter ya existe en la fila
+    if caracter in sudoku[fila]:
+        return False
+    # Comprobar si el caracter ya existe en la columna
+    if caracter in [sudoku[i][columna] for i in range(9)]:
+        return False
+    # Comprobar si el caracter ya existe en la región 3x3
+    fila_region = (fila // 3) * 3
+    columna_region = (columna // 3) * 3
+    for i in range(fila_region, fila_region + 3):
+        for j in range(columna_region, columna_region + 3):
+            if sudoku[i][j] == caracter:
+                return False
+    return True
+
+def rellenar_sudoku(sudoku, caracteres):
+    """Rellena el Sudoku usando un algoritmo de backtracking.
+
+    Args:
+      sudoku: La cuadrícula del Sudoku.
+      caracteres: La lista de caracteres posibles (números o letras).
+
+    Returns:
+      True si se pudo rellenar, False en caso contrario.
+    """
+    for fila in range(9):
+        for columna in range(9):
+            if sudoku[fila][columna] == 0:  # Si la celda está vacía
+                caracteres_posibles = caracteres.copy()  # Copiar para no modificar la lista original
+                random.shuffle(caracteres_posibles)  # Aleatorizar el orden de los caracteres
+                for caracter in caracteres_posibles:
+                    if es_valido(sudoku, fila, columna, caracter):  # Verificar si es válido
+                        sudoku[fila][columna] = caracter  # Asignar el caracter
+                        if rellenar_sudoku(sudoku, caracteres):  # Recursivamente intentar rellenar el resto
+                            return True  # Si se pudo rellenar, retornar True
+                        sudoku[fila][columna] = 0  # Si no se pudo, deshacer la asignación (backtracking)
+                return False  # Si no se encontró ningún caracter válido, retornar False
+    return True  # Si se rellenaron todas las celdas, retornar True
+
+def generar_sudoku(tipo_sudoku):
+    """Genera un Sudoku completo.
+
+    Args:
+      tipo_sudoku: El tipo de Sudoku ("numeros" o "letras").
+
+    Returns:
+      Una cuadrícula de Sudoku completa.
+    """
+    if tipo_sudoku == "numeros":
+        caracteres = list(range(1, 10))
+    elif tipo_sudoku == "letras":
+        caracteres = list("ABCDEFGHI")
+    else:
+        raise ValueError("Tipo de Sudoku inválido")
+    sudoku = crear_sudoku_vacio()
+    rellenar_sudoku(sudoku, caracteres)
+    return sudoku
+
+def eliminar_valores(sudoku, dificultad):
+    """Elimina valores del Sudoku para crear el juego.
+
+    Args:
+      sudoku: La cuadrícula del Sudoku.
+      dificultad: El nivel de dificultad (1-Fácil, 2-Medio, 3-Difícil).
+    """
+    if dificultad == 1:
+        casillas_a_eliminar = 20  # Fácil
+    elif dificultad == 2:
+        casillas_a_eliminar = 35  # Medio
+    elif dificultad == 3:
+        casillas_a_eliminar = 50  # Difícil
+    else:
+        raise ValueError("Nivel de dificultad inválido")
+
+    casillas_eliminadas = 0
+    while casillas_eliminadas < casillas_a_eliminar:
+        fila = random.randint(0, 8)
+        columna = random.randint(0, 8)
+        if sudoku[fila][columna] != 0:
+            sudoku[fila][columna] = 0
+            casillas_eliminadas += 1
+
+# --- Fin de las funciones del Sudoku ---
+
+
+# --- Funciones de la interfaz gráfica ---
+
+def dibujar_tablero(pantalla, sudoku, tipo_sudoku, celda_seleccionada=None):
+    """Dibuja el tablero de Sudoku en la pantalla."""
+    pantalla.fill((255, 255, 255))  # Fondo blanco
+    for i in range(10):
+        grosor = 4 if i % 3 == 0 else 1
+        pygame.draw.line(pantalla, (0, 0, 0), (50 + i * 50, 50), (50 + i * 50, 500), grosor)  # Líneas verticales
+        pygame.draw.line(pantalla, (0, 0, 0), (50, 50 + i * 50), (500, 50 + i * 50), grosor)  # Líneas horizontales
+
+    fuente = pygame.font.Font(None, 40)
+    for fila in range(9):
+        for columna in range(9):
+            valor = sudoku[fila][columna]
+            if valor != 0:
+                if tipo_sudoku == "numeros":
+                    texto = fuente.render(str(valor), True, (0, 0, 0))
+                else:
+                    texto = fuente.render(chr(valor + 64), True, (0, 0, 0))  # Convertir a letra
+                x = 50 + columna * 50 + 15
+                y = 50 + fila * 50 + 10
+                pantalla.blit(texto, (x, y))
+
+    # Resaltar celda seleccionada
+    if celda_seleccionada:
+        fila, columna = celda_seleccionada
+        pygame.draw.rect(pantalla, (255, 0, 0), (50 + columna * 50, 50 + fila * 50, 50, 50), 3)
+
+def obtener_celda_click(pos):
+    """Obtiene la fila y columna de la celda clickeada."""
+    x, y = pos
+    if 50 <= x <= 500 and 50 <= y <= 500:
+        fila = (y - 50) // 50
+        columna = (x - 50) // 50
+        return fila, columna
+    return None
+
+def mostrar_mensaje(pantalla, mensaje):
+    """Muestra un mensaje en la pantalla."""
+    fuente = pygame.font.Font(None, 40)
+    texto = fuente.render(mensaje, True, (0, 0, 0))
+    rect_texto = texto.get_rect(center=(275, 550))
+    pantalla.blit(texto, rect_texto)
+
+# --- Fin de las funciones de la interfaz gráfica ---
+
+
+if __name__ == "__main__":
+    pygame.init()
+    pantalla = pygame.display.set_mode((550, 600))
+    pygame.display.set_caption("Sudoku")
+
+    tipo_sudoku = input("¿Qué tipo de Sudoku quieres? (numeros/letras): ").strip().lower()
+    try:
+        sudoku_original = generar_sudoku(tipo_sudoku)
+        sudoku_usuario = [fila[:] for fila in sudoku_original]
+
+        dificultad = int(input("Selecciona la dificultad (1-Fácil, 2-Medio, 3-Difícil): "))
+        eliminar_valores(sudoku_usuario, dificultad)
+
+        celda_seleccionada = None
+        juego_terminado = False
+
+        while True:
+            for evento in pygame.event.get():
+                if evento.type == pygame.QUIT:
+                    pygame.quit()
+                    exit()
+                if evento.type == pygame.MOUSEBUTTONDOWN:
+                    if not juego_terminado:
+                        celda_seleccionada = obtener_celda_click(evento.pos)
+                if evento.type == pygame.KEYDOWN:
+                    if celda_seleccionada and not juego_terminado:
+                        fila, columna = celda_seleccionada
+                        if evento.key == pygame.K_BACKSPACE:
+                            sudoku_usuario[fila][columna] = 0
+                        elif tipo_sudoku == "numeros" and evento.unicode.isdigit() and 1 <= int(evento.unicode) <= 9:
+                            sudoku_usuario[fila][columna] = int(evento.unicode)
+                        elif tipo_sudoku == "letras" and evento.unicode.isalpha() and "A" <= evento.unicode.upper() <= "I":
+                            sudoku_usuario[fila][columna] = ord(evento.unicode.upper()) - 64
+
+            dibujar_tablero(pantalla, sudoku_usuario, tipo_sudoku, celda_seleccionada)
+
+            if not juego_terminado and all(0 not in fila for fila in sudoku_usuario):
+                juego_terminado = True
+                if validar_sudoku(sudoku_original, sudoku_usuario):
+                    mostrar_mensaje(pantalla, "¡Felicidades! Has resuelto el Sudoku.")
+                else:
+                    mostrar_mensaje(pantalla, "Hay errores en el Sudoku, Perdiste")
+
+            pygame.display.flip()
+
+    except ValueError as e:
+        print(e)
+        pygame.quit()
